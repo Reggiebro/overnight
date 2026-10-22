@@ -8,6 +8,10 @@ tags: devchallenge, hf26challenge, opensource
 
 <!-- Suggested DEV tags: devchallenge, hf26challenge, opensource, ai -->
 
+![Overnight: the same alert text on the left, and the two-sentence brief the local model produced on the right — "The alert has been triggered twice in the last hour, and the volume is increasing. Yesterday's incident took three hours to resolve due to the absence of the runbook."](https://raw.githubusercontent.com/Reggiebro/overnight/master/demo_hero.png)
+
+*Real model output. The input on the left is an alert I actually received; the brief on the right is what Qwen 2.5 1.5B produced on the Oracle box, with no API key and nothing sent anywhere.*
+
 ## The Backstory
 
 I own a 2011 MEDION E7216 laptop. It is old, it has no battery, and it has a habit of turning itself off.
