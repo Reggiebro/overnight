@@ -1,37 +1,28 @@
 ---
 title: "I Built an Agent That Reads So I Don't Have To"
-tags: ["hacktoberfest", "opensource", "ai", "python"]
-published: false
-description: "Overnight runs a local open-weight model on my own machine, reads everything I point it at, and hands me a two-line brief in the morning. No API key, no cloud, no bill. Here is why that is the point."
+published: true
+tags: devchallenge, hf26challenge
 ---
 
-# I Built an Agent That Reads So I Don't Have To
+*This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 3: Slow and Steady](https://dev.to/challenges/hacktoberfest-week3-2026-10-19)*
 
-This is my entry for the Hacktoberfest "Slow and Steady" challenge. The theme asks
-you to build something that rewards laziness. I took it literally: I built a tool
-that does the slow, boring part of my morning so I can be lazy instead.
+## What I Built
 
-It's called **Overnight**, and it works while I sleep.
+Overnight is a small agent that reads the things I don't want to read, overnight,
+and hands me a two-line brief per item in the morning.
 
-## The actual problem
+You point it at a folder, a single file, a URL, or stdin. It reads every item,
+runs an open-weight model **on my own machine**, and writes a two-sentence brief
+per item to a markdown file. I wake up, open one file, I'm caught up.
 
-I read a lot of things I don't want to read. Support tickets, changelogs, incident
-reports, long pull-request discussions. Each one is three paragraphs of setup for
-two sentences of content. Reading them is not hard. It's just *wasteful* — my
-attention gets spent on filler so I can find the two lines that matter.
+The effort it saves is attention, not time. I read a lot of things that are three
+paragraphs of setup for two sentences of content — support tickets, changelogs,
+incident reports. Reading them is not hard, it's wasteful. And the timing makes it
+worse: nobody wants to open forty tabs at 8am. So the fix isn't a better reader,
+it's doing the reading while I'm asleep.
 
-The annoying part isn't the volume. It's the timing. Nobody wants to open forty
-tabs at 8am. By the time you've read them you've already been awake for an hour,
-and the day has started in a worse mood than it needed to.
-
-So the fix isn't a better reader. It's doing the reading while you're asleep.
-
-## What it does
-
-You point Overnight at something — a folder, a single file, a URL, or stdin. It
-reads every item, runs an open-weight model **on your own machine**, and writes a
-two-sentence brief per item to a markdown file. You wake up, open one file, and
-you're caught up.
+That's the laziness it rewards. Not "I don't want to work" — "this task should not
+cost me attention."
 
 ```
 # Morning brief — 2026-10-22 20:26 UTC
@@ -50,18 +41,38 @@ python3 overnight.py --url https://example.com/feed --out brief.md
 cat notes.txt | python3 overnight.py --out brief.md
 ```
 
-That's the whole tool. There is no cleverness in it. It's a watcher, a model, and
-a file. Which is exactly why it fits "Slow and Steady" — it runs every night
+That's the whole tool. There is no cleverness in it — it's a watcher, a model, and
+a file. Which is exactly why it fits "Slow and Steady": it runs every night
 without being asked, and it produces the same correct result every time.
 
-## Why open source isn't a marketing line here
+## Demo
 
-I want to be specific, because "uses AI" is not the same as "uses open-source AI."
-The model is a GGUF file sitting on disk — currently Qwen 2.5 1.5B Q4_K_M. The
-harness is about 250 lines of Python with no SDK from any vendor.
+**Live: https://92.5.41.244:8000/overnight/** — paste any text, click the button,
+get a two-sentence brief from a local model. Nothing is sent to a provider.
 
-That choice is the project. A closed API would have made most of the above
-impossible, and here's the concrete reason:
+Video: https://github.com/Reggiebro/overnight/releases/download/v1.0.0/demo.mp4
+
+It runs on a free Oracle Cloud instance (8 vCPU / 24 GB) with the model on disk.
+It also proves the thing works on hardware that isn't my laptop — I had to move it
+because my old machine has a firmware thermal trip and was shutting itself down
+under CPU load. The agent now lives somewhere it can't cook itself.
+
+## Code
+
+<script class="devrelay-embed"
+  src="https://devrelay.com/embed/Reggiebro/overnight"
+  data-theme="dark"></script>
+
+## How I Built It
+
+The summariser is a GGUF model sitting on disk — currently Qwen 2.5 1.5B Q4_K_M.
+The harness is about 250 lines of Python with no SDK from any vendor. It talks to
+`llama-cli` as a subprocess, or to `llama-server` on localhost:8080 when a server
+is already running (which keeps the model resident, so a second item costs one
+forward pass instead of a full reload).
+
+That open-source core is not decorative — it's what makes the project work. Here's
+the concrete reason a closed API would have made most of the above impossible:
 
 - **Nothing leaves the machine.** These are my tickets, my notes, my reading. With
   an API I'd be uploading them to someone else's server to have a summary handed
@@ -74,11 +85,25 @@ impossible, and here's the concrete reason:
   unchanged. Better model comes out? Drop it in. Want to fine-tune on your own
   vocabulary? You can, because you own the weights.
 - **You can read the whole thing.** There's no black box to take on faith. If I
-  want to know why a summary came out a certain way, I can read the code and
-  check.
+  want to know why a summary came out a certain way, I can read the code.
 
 The last one mattered most to me. A closed model would be a black box that can
 change under me without notice. An open one is a file I can inspect.
+
+## Why Does Open Innovation Matter?
+
+Because the reading stays mine. That's the whole argument.
+
+I read things that are awkward to hand to a third party: incident notes with
+internal hostnames, draft docs that aren't published, tickets with customer names.
+With a closed API I'd be choosing between not using the tool and shipping that
+text somewhere I don't control. With an open model on disk, there's no third party
+to leak to, no account to suspend, and no provider that can change its terms
+under me. The tool works on a plane. It costs nothing when I run it every night.
+And if the model gets worse, I swap it — I'm not waiting for someone else's
+roadmap.
+
+Open innovation made the project possible. Closed would have made it a trade-off.
 
 ## The part I'm actually proud of
 
@@ -91,31 +116,17 @@ last sentence — a real compression, not an invention. And if there's genuinely
 nothing to summarise, it exits non-zero rather than quietly writing an empty file.
 
 There's a subtler version of the same problem. `find_model()` searches a few
-directories and picks the smallest usable GGUF. If it just returned the first
-file it found, a truncated download would be reported as "local mode" while every
-call silently fell back to the extractive path — the header would be lying. So
-it probes each candidate with a real load before returning it, and rejects
-anything that doesn't actually load. The header can be trusted because the
-check is real.
+directories and picks the smallest usable GGUF. If it just returned the first file
+it found, a truncated download would be reported as "local mode" while every call
+silently fell back to the extractive path — the header would be lying. So it probes
+each candidate with a real load before returning it, and rejects anything that
+doesn't actually load. The header can be trusted because the check is real.
 
 A failed URL fetch is handled the same way: it becomes an item that literally says
 `[fetch failed: HTTP 502]`, so a Cloudflare error page never gets summarised into
 fake news in your morning brief.
 
 That's the standard I held it to: the tool never claims more than it did.
-
-## The demo
-
-It's running on a free Oracle Cloud instance (8 vCPU / 24 GB) with the model on
-disk:
-
-**https://92.5.41.244:8000/overnight/**
-
-Paste any text, click the button, get a two-sentence brief from the local model.
-Nothing is sent to a provider. It's also proof the thing works on hardware that
-isn't my laptop — I had to move it because my old machine has a firmware thermal
-trip and was shutting itself down under CPU load. The agent now lives somewhere
-it can't cook itself.
 
 ## The honest limits
 
@@ -125,8 +136,8 @@ I'd rather say this than have you find out:
   without a GPU and loads in seconds. It is not clever, it is not witty, and it
   will occasionally produce a summary that misses the point. For a real setup you'd
   swap in something larger.
-- **Output is in English.** The model is mostly English-trained. If you feed it
-  Bosnian it'll give you English back.
+- **Output is in English.** The model is mostly English-trained. Feed it Bosnian
+  and it'll give you English back.
 - **It summarises, it doesn't think.** It compresses. It won't tell you the
   incident report is wrong, or that the changelog contradicts last week's.
 - **CPU inference is slow at scale.** Fine for a morning brief. Not for a corpus.
@@ -148,19 +159,26 @@ python3 overnight.py --watch ~/inbox --out ~/morning-brief.md
 The tests are worth a look — they cover the claims I made above rather than just
 that functions return things. A corrupt GGUF is rejected, a failed fetch becomes
 an explicit error, the extractive fallback is deterministic, and the header never
-claims `local mode` without a model. CI runs the same suite on Python 3.10–3.12.
+claims `local mode` without a model. CI runs the same suite on Python 3.10–3.12
+and is green.
 
 There's a `--json` flag if you want to pipe it into something else, and a cron
 line in the README if you want it to actually run while you sleep.
 
-## The point
+## Prize Categories
 
-I wanted a tool that rewards laziness. Not laziness as in "I don't want to work" —
-laziness as in "this task should not cost me attention." Reading forty things to
-find two sentences is exactly that kind of task.
+I'm entering for **Best Use of GitHub Copilot** — the workflow automation here is
+GitHub Actions: the test suite runs automatically on every push across three
+Python versions, plus a no-model smoke test that verifies the tool still produces
+a correct extractive brief with no model present. That's the category where this
+project's automation actually shows.
 
-Open-source AI is what makes it possible to hand that task to a machine without
-handing the contents of my life to a server at the same time. That's the
-argument the project makes, and it's the one I'd stand behind.
+## The Lazy Payoff
 
-Slow and steady: run it every night, trust it in the morning.
+I've been running it nightly. The payoff is small and specific: I stopped opening
+the inbox folder in the morning. I open one file instead of forty tabs, and the
+day starts without the "read forty things before coffee" tax.
+
+The tool has no cleverness in it. It's a watcher, a model, and a file. It works
+because it runs every night without being asked and produces the same correct
+result. Slow and steady: run it every night, trust it in the morning.
