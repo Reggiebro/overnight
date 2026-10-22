@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run the suite
+        run: python3 -m pytest tests/ -q
+      - name: "Smoke test: extractive mode with no model present"
+        run: |
+          mkdir -p /tmp/inbox
+          printf 'Alpha. Beta. Gamma.\n' > /tmp/inbox/a.txt
+          python3 overnight.py --watch /tmp/inbox --out /tmp/brief.md
+          cat /tmp/brief.md
+          grep -q "extractive mode" /tmp/brief.md

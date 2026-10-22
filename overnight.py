@@ -57,7 +57,6 @@ MODEL_DIRS = [
     os.path.expanduser("~/models"),
 ]
 
-
 def find_model(explicit=None):
     """Locate a usable GGUF. Prefer smaller quantisation for constrained RAM.
 
@@ -202,8 +201,21 @@ def local_summarise(text, model, max_chars=180):
         # answer never looks like that, so reject it rather than summarising
         # the tool's own progress output.
         if any(m in out for m in ("loading model", "error:", "failed to load",
-                                  "the server exited", "\b", "llama_")):
+                                  "the server exited", "llama_", "exiting...",
+                                  "prompt:", "generation:", "[", "|")):
             continue
+        # llama.cpp chat templates echo the user turn and terminate with "Exiting..."
+        # when generation ends without printing the assistant text to stdout.
+        # Strip the echo and the trailing status line, then keep whatever prose
+        # sits between them.
+        if "Exiting..." in out:
+            out = out.rsplit("Exiting...", 1)[0]
+        if ">" in out:
+            out = out.rsplit(">", 1)[-1]
+        # drop leading prompt echo: anything before the prompt's own "Text:" marker
+        if "Text:" in out:
+            out = out.rsplit("Text:", 1)[-1]
+        out = out.strip()
         if not out or out.lower().startswith(prompt.lower()[:40]):
             continue
 

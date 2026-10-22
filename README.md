@@ -1,6 +1,7 @@
-# Overnight
+# Overnight — a local agent that does the reading while you sleep.
 
-A local agent that does the reading while you sleep.
+Hacktoberfest Week 3 entry. Theme: **"Slow and Steady"** — build something that
+rewards laziness by doing the work for you.
 
 You point it at a folder, a URL, or a pile of text. It summarises everything
 with an **open-weight model running on your own machine**, and leaves a short
@@ -8,11 +9,21 @@ brief where you will see it in the morning.
 
 No API key. No account. No cloud. No subscription.
 
+## Live demo
+
+**https://92.5.41.244:8000/overnight/** — paste text, get a two-sentence brief
+from a local model. Runs on a free Oracle Cloud instance (8 vCPU / 24 GB) with
+a Qwen 2.5 1.5B GGUF model. Nothing is sent to a provider.
+
 ## The idea
 
 Nobody wants to open forty tabs at 8am. Overnight reads them overnight and
 hands you a two-line brief per item. The work happens while you sleep — that
 is the whole point.
+
+The theme is "Slow and Steady": the project is built around doing the slow,
+boring reading so you do not have to. It is a small tool that rewards laziness
+by being reliable. That is the entire thesis.
 
 ## Why open-source AI is the core
 
@@ -86,10 +97,8 @@ python3 overnight.py --watch ~/inbox --out brief.json --json
 the server once and Overnight will use it automatically:
 
 ```bash
-LD_LIBRARY_PATH=~/.local/share/llama/build/bin \
-  ~/.local/share/llama/build/bin/llama-server \
-  -m ~/.local/share/llama/qwen-uncensored.gguf \
-  -c 1024 -t 2 --host 127.0.0.1 --port 8080
+llama-server -m ~/.local/share/llama/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  -c 2048 -t 8 --host 0.0.0.0 --port 8080
 ```
 
 With no server running, Overnight falls back to the CLI and still works.
@@ -104,17 +113,40 @@ the output rather than quietly pretending.
 The extractive fallback is a real compression of your text — it never invents
 content. A model brief is a genuine generation.
 
+`find_model()` probes each candidate GGUF with a real load before returning it,
+so a truncated download is rejected rather than silently falling back to the
+extractive path while the header still claims `local mode`.
+
+## Tests
+
+```bash
+pip install pytest
+python3 -m pytest tests/ -q
+```
+
+The suite covers the claims the README makes: a corrupt GGUF is never reported
+as usable, a failed URL fetch becomes an explicit error item instead of fake
+news, the extractive fallback is deterministic and bounded, and the output
+header never claims `local mode` without a model.
+
+CI runs the same suite on Python 3.10–3.12 on every push and pull request.
+
 ## Example output
 
 ```
-# Morning brief — 2026-10-22 09:37 UTC
+# Morning brief — 2026-10-22 20:26 UTC
 
-_1 item(s), local mode, model `qwen-uncensored.gguf`_
+_2 item(s), local mode, model `qwen2.5-1.5b-instruct-q4_k_m.gguf`_
 
-- **news.txt** — The city council voted to extend the overnight transit pilot
-  for another six months, with ridership data showing a 34 percent increase in
-  late-shift commuters. The programme will n...
+- **a.txt** — The first sentence is here. The second sentence is beyond it.
+- **b.txt** — The server is up. The team is working.
 ```
+
+## Why this fits "Slow and Steady"
+
+The project has no cleverness in it. It is a watcher, a model, and a file. What
+makes it work is that it runs every night without being asked and produces the
+same correct result. Slow and steady.
 
 ## License
 
