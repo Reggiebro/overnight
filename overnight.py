@@ -59,7 +59,12 @@ MODEL_DIRS = [
 
 
 def find_model(explicit=None):
-    """Locate a usable GGUF. Prefer smaller quantisation for constrained RAM."""
+    """Locate a usable GGUF. Prefer smaller quantisation for constrained RAM.
+
+    Only returns a model that is actually loadable: a corrupt or truncated GGUF
+    would otherwise be reported as "local mode" while every call silently falls
+    back to the extractive path, which is a lie about what produced the brief.
+    """
     if explicit:
         return explicit if os.path.exists(explicit) else None
     candidates = []
@@ -77,10 +82,45 @@ def find_model(explicit=None):
             if size < 300_000_000:
                 continue
             candidates.append((size, path))
-    # smallest first: less RAM, faster on constrained hardware
+    # smallest first: less RAM, faster on constrained hardware.
+    # Only the first candidate is probed — loading every GGUF on disk to check
+    # it would take minutes, and the smallest working one is the right choice
+    # for constrained RAM anyway.
     for _, path in sorted(candidates):
         return path
     return None
+
+
+def model_loads(path, timeout=45):
+    """Cheap structural check: is this actually a readable GGUF?
+
+    Reads the magic bytes and then does a real minimal load, so a corrupt
+    download is rejected without waiting for llama.cpp to fail a minute later.
+    """
+    try:
+        with open(path, "rb") as f:
+            magic = f.read(4)
+            if magic != b"GGUF":
+                return False
+            f.seek(8)
+            # version (u32) + tensor_count (u64) + kv_count (u64)
+            if f.seek(8 + 4) and f.read(8) is None:
+                return False
+        # a real load attempt on a tiny context is the only sure test
+        cmd = [llama_bin(), "-m", path, "-p", "x", "-n", "1", "-c", "128",
+               "-t", "1", "--no-warmup", "--log-disable"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        blob = ((r.stdout or "") + (r.stderr or "")).lower()
+        if "error loading model" in blob or "failed to load" in blob:
+            return False
+        if "is not within the file bounds" in blob or "corrupted" in blob:
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        # a slow load is not proof of corruption
+        return True
+    except Exception:
+        return False
 
 
 def llama_bin():
@@ -136,9 +176,10 @@ def local_summarise(text, model, max_chars=180):
     # ── path 2: one-shot CLI ─────────────────────────────────────────────
     variants = [
         [llama_bin(), "-m", model, "-p", prompt, "-n", "80", "-c", "1024",
-         "-t", "2", "--no-warmup", "--chat-template", "chatml"],
+         "-t", "2", "--no-warmup", "--chat-template", "chatml",
+         "--log-disable", "--no-display-prompt"],
         [llama_bin(), "-m", model, "-p", prompt, "-n", "80", "-c", "1024",
-         "-t", "2", "--no-warmup"],
+         "-t", "2", "--no-warmup", "--log-disable", "--no-display-prompt"],
     ]
     for cmd in variants:
         try:
@@ -155,14 +196,47 @@ def local_summarise(text, model, max_chars=180):
             out = out.rsplit(">", 1)[-1].strip()
         out = re.sub(r"<\|[^|]*\|>", " ", out)
         out = re.sub(r"\n{2,}", "\n", out).strip()
+
+        # llama-cli mixes status spinners and load errors into stdout. A real
+        # answer never looks like that, so reject it rather than summarising
+        # the tool's own progress output.
+        if any(m in out for m in ("loading model", "error:", "failed to load",
+                                  "the server exited", "\b", "llama_")):
+            continue
         if not out or out.lower().startswith(prompt.lower()[:40]):
             continue
+
         sents = re.split(r"(?<=[.!?])\s+", out)
         brief = " ".join(sents[:2]).strip()
         if brief:
             return brief[:max_chars], "local"
 
     return None, "empty"
+
+
+def resolve_running_model(fallback):
+    """Which model actually answered: the resident server's, or our fallback.
+
+    If llama-server is running it may hold a different GGUF than --model, and
+    the brief came from the server. Report that truthfully.
+
+    /props exposes it as model_path (llama.cpp ServerApp schema); older builds
+    used default_generation_settings.model, so both are tried.
+    """
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8080/props")
+        req.add_header("User-Agent", "overnight/1.0")
+        with urllib.request.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode())
+        for candidate in (
+            d.get("model_path"),
+            (d.get("default_generation_settings") or {}).get("model"),
+        ):
+            if candidate:
+                return candidate
+    except Exception:
+        pass
+    return fallback
 
 
 def extractive_summary(text, max_chars=180):
@@ -180,22 +254,33 @@ def extractive_summary(text, max_chars=180):
 
 
 def collect(watch=None, url=None, stdin=False):
-    """Gather raw text items. Each item is (source, text)."""
+    """Gather raw text items. Each item is (source, text).
+
+    A failed fetch is reported as an item containing the error, not silently
+    summarised as if it were content — otherwise a Cloudflare error page
+    becomes "news" in the morning brief.
+    """
     items = []
     if url:
         req = urllib.request.Request(url, headers={"User-Agent": "overnight/1.0"})
         try:
             with urllib.request.urlopen(req, timeout=45) as r:
+                if r.status != 200:
+                    items.append((url, f"[fetch failed: HTTP {r.status}]"))
+                    return items
                 body = r.read().decode("utf-8", "replace")
-            # strip tags: the model should see prose, not markup
             body = re.sub(r"<script.*?</script>", " ", body, flags=re.S)
             body = re.sub(r"<style.*?</style>", " ", body, flags=re.S)
             body = re.sub(r"<[^>]+>", " ", body)
             body = re.sub(r"\s+", " ", body).strip()
-            if body:
+            if not body:
+                items.append((url, "[fetch returned no readable text]"))
+            else:
                 items.append((url, body))
+        except urllib.error.HTTPError as e:
+            items.append((url, f"[fetch failed: HTTP {e.code}]"))
         except Exception as e:
-            items.append((url, f"[could not fetch: {e}]"))
+            items.append((url, f"[fetch failed: {e}]"))
     if watch:
         if os.path.isdir(watch):
             for fn in sorted(os.listdir(watch)):
@@ -263,19 +348,27 @@ def main():
 
     lines, mode = build_brief(items, model)
 
+    # The header names the model actually used. When a resident server answers,
+    # the model is the server's, not necessarily the one on disk — so report
+    # what ran rather than what was requested.
+    effective_model = model
+    if mode == "local" and model:
+        effective_model = resolve_running_model(model)
+
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     if args.json:
         payload = {
             "generated_at": now,
             "mode": mode,
-            "model": model,
+            "model": effective_model,
             "items": [{"source": s, "brief": b, "how": h} for s, b, h in lines],
         }
         text = json.dumps(payload, indent=2, ensure_ascii=False)
     else:
         out = [f"# Morning brief — {now}", "",
                f"_{len(lines)} item(s), {mode} mode"
-               + (f", model `{os.path.basename(model)}`" if model and mode == "local" else "") + "_", ""]
+               + (f", model `{os.path.basename(effective_model)}`"
+                  if effective_model and mode == "local" else "") + "_", ""]
         for src, brief, how in lines:
             out.append(f"- **{os.path.basename(src)}** — {brief}")
         out.append("")
