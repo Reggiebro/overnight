@@ -1,4 +1,6 @@
-# Overnight — a local agent that does the reading while you sleep.
+# Overnight
+
+A local agent that does the reading while you sleep.
 
 Hacktoberfest Week 3 entry. Theme: **"Slow and Steady"** — build something that
 rewards laziness by doing the work for you.
@@ -15,15 +17,37 @@ No API key. No account. No cloud. No subscription.
 from a local model. Runs on a free Oracle Cloud instance (8 vCPU / 24 GB) with
 a Qwen 2.5 1.5B GGUF model. Nothing is sent to a provider.
 
+## The backstory
+
+I own a 2011 MEDION E7216 laptop. It has no battery, and it turns itself off.
+
+It doesn't crash — it shuts down *cleanly*, which is the trap. A clean shutdown
+looks deliberate, so you go looking for a software cause. I checked everything.
+
+The logs said:
+
+```
+Oct 22 15:36:15 kernel: thermal thermal_zone0: acpitz: critical temperature reached
+Oct 22 15:36:15 kernel: reboot: HARDWARE PROTECTION shutdown (Temperature too high)
+```
+
+Four times in one day. Firmware thermal protection: the 2011 BIOS reads an
+uncalibrated board sensor and trips. The CPU sat at 41-45 °C against a 90 °C
+critical trip — the CPU was never the problem. The drives were: SMART was
+logging the Toshiba at 102-120 °C.
+
+So I moved the agent to a free Oracle Cloud instance. That move is why the demo
+works — I can't demo something on a laptop that may die mid-run.
+
 ## The idea
 
 Nobody wants to open forty tabs at 8am. Overnight reads them overnight and
 hands you a two-line brief per item. The work happens while you sleep — that
 is the whole point.
 
-The theme is "Slow and Steady": the project is built around doing the slow,
-boring reading so you do not have to. It is a small tool that rewards laziness
-by being reliable. That is the entire thesis.
+The effort it saves is attention, not time. I read a lot of things that are
+three paragraphs of setup for two sentences of content. Reading them isn't
+hard, it's wasteful. And the timing makes it worse.
 
 ## Why open-source AI is the core
 
@@ -31,9 +55,10 @@ The summariser is a local GGUF model (Llama 3.2 3B Q4_K_M, or Qwen 2.5 1.5B).
 That is not a detail; it is what makes the project work:
 
 - **Nothing leaves the machine.** Your messages, your files, your reading — all
-  of it stays local. There is no server to trust and no provider to leak to.
+  of it stays local. No server to trust, no provider to leak to.
 - **It costs nothing to run.** CPU inference on a free model. No per-call
-  billing, no usage cap, no credit card.
+  billing, no usage cap, no credit card. This is what made the free-tier cloud
+  deployment possible.
 - **It works offline.** A train, a plane, a cabin with no signal: the agent
   still runs, because the model is on disk.
 - **You can swap the model.** Point `--model` at any GGUF and the pipeline is
@@ -62,7 +87,7 @@ python3 overnight.py --watch ~/inbox --out ~/morning-brief.md
 
 # or be explicit
 python3 overnight.py --watch ~/inbox \
-    --model ~/.local/share/llama/qwen-uncensored.gguf \
+    --model ~/.local/share/llama/qwen2.5-1.5b-instruct-q4_k_m.gguf \
     --out ~/morning-brief.md
 ```
 
@@ -117,6 +142,9 @@ content. A model brief is a genuine generation.
 so a truncated download is rejected rather than silently falling back to the
 extractive path while the header still claims `local mode`.
 
+A failed URL fetch becomes an item that literally says `[fetch failed: HTTP
+502]`, so a Cloudflare error page never becomes fake news in your morning brief.
+
 ## Tests
 
 ```bash
@@ -131,6 +159,18 @@ header never claims `local mode` without a model.
 
 CI runs the same suite on Python 3.10–3.12 on every push and pull request.
 
+## The honest limits
+
+- **The model is small.** Qwen 2.5 1.5B is deliberately tiny — it runs on CPU
+  without a GPU and loads in seconds. It is not clever, it is not witty, and it
+  will occasionally produce a summary that misses the point. For a real setup
+  you'd swap in something larger.
+- **Output is in English.** The model is mostly English-trained. Feed it
+  Bosnian and it'll give you English back.
+- **It summarises, it doesn't think.** It compresses. It won't tell you the
+  incident report is wrong, or that the changelog contradicts last week's.
+- **CPU inference is slow at scale.** Fine for a morning brief. Not for a corpus.
+
 ## Example output
 
 ```
@@ -141,12 +181,6 @@ _2 item(s), local mode, model `qwen2.5-1.5b-instruct-q4_k_m.gguf`_
 - **a.txt** — The first sentence is here. The second sentence is beyond it.
 - **b.txt** — The server is up. The team is working.
 ```
-
-## Why this fits "Slow and Steady"
-
-The project has no cleverness in it. It is a watcher, a model, and a file. What
-makes it work is that it runs every night without being asked and produces the
-same correct result. Slow and steady.
 
 ## License
 
