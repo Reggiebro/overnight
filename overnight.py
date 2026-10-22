@@ -83,11 +83,12 @@ def find_model(explicit=None):
                 continue
             candidates.append((size, path))
     # smallest first: less RAM, faster on constrained hardware.
-    # Only the first candidate is probed — loading every GGUF on disk to check
-    # it would take minutes, and the smallest working one is the right choice
-    # for constrained RAM anyway.
+    # Probe each candidate with model_loads() and return the first that really
+    # loads — a truncated GGUF otherwise gets reported as "local mode" while
+    # every call silently falls back to the extractive path.
     for _, path in sorted(candidates):
-        return path
+        if model_loads(path):
+            return path
     return None
 
 
