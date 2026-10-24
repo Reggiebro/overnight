@@ -36,7 +36,7 @@ The effort it saves is **attention, not time**. It reads the forty things overni
 
 ### Live demo
 
-**https://92.5.41.244:8000/overnight/** — paste text, get a two-sentence brief from a local model. Runs on a free Oracle Cloud instance (8 vCPU / 24 GB) with a Qwen 2.5 1.5B GGUF model. Nothing is sent to a provider.
+**https://92.5.95.177.sslip.io/overnight-demo/** — paste text, get a two-sentence brief from a local model. Runs on a free Oracle Cloud instance (8 vCPU / 24 GB) with a Qwen 2.5 1.5B GGUF model. Nothing is sent to a provider.
 
 ### Video walkthrough
 
