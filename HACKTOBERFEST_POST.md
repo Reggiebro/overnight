@@ -66,7 +66,7 @@ That's the whole tool. No cleverness in it — a watcher, a model, and a file. W
 
 ## Demo
 
-**Live: https://92.5.41.244:8000/overnight/** — paste any text, click the button, get a two-sentence brief from a local model. Nothing is sent to a provider.
+**Live: https://92.5.95.177.sslip.io/overnight-demo/** — paste any text, click the button, get a two-sentence brief from a local model. Nothing is sent to a provider.
 
 <video src="https://github.com/Reggiebro/overnight/releases/download/v1.0.0/demo.mp4" controls width="100%"></video>
 

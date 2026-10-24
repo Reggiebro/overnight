@@ -32,7 +32,7 @@ instance. No API key, open-weight model on disk, nothing leaves the machine.
 It's my Hacktoberfest Week 3 entry. Theme is "Slow and Steady" — build something
 that rewards laziness. This one does the reading while I'm asleep.
 
-Live demo: https://92.5.41.244:8000/overnight/
+Live demo: https://92.5.95.177.sslip.io/overnight-demo/
 
 The honest part I like: the header only says "local mode" when the model actually
 answered. No model? It says "extractive mode" and takes the first and last
@@ -63,7 +63,7 @@ part I'm proud of isn't the summary. It's that the header only says "local mode"
 when the model actually answered. Otherwise it says so. A failed fetch becomes
 "[fetch failed: HTTP 502]" — never fake news.
 
-5/ Demo: https://92.5.41.244:8000/overnight/
+5/ Demo: https://92.5.95.177.sslip.io/overnight-demo/
 Write-up: https://dev.to/reggiebro/i-built-an-agent-that-reads-so-i-dont-have-to-346a
 
 Honest limit: the model is Qwen 2.5 1.5B. Tiny. Not clever. Swap in something
@@ -81,7 +81,7 @@ API key, nothing leaves the machine.
 Theme was "Slow and Steady" — reward laziness. This one does the reading while
 I'm asleep.
 
-Live demo: https://92.5.41.244:8000/overnight/
+Live demo: https://92.5.95.177.sslip.io/overnight-demo/
 Write-up: https://dev.to/reggiebro/i-built-an-agent-that-reads-so-i-dont-have-to-346a
 
 The honest part: the header only says "local mode" when the model actually
@@ -120,7 +120,7 @@ My first version fell back to extractive mode and *looked* fine while never usin
 the model. Fix was llama-server on 8080, which the tool already supported as a
 resident path.
 
-Demo: https://92.5.41.244:8000/overnight/
+Demo: https://92.5.95.177.sslip.io/overnight-demo/
 Code: https://github.com/Reggiebro/overnight
 
 ---
@@ -165,6 +165,6 @@ Top članci imaju 44-55 reakcija. Oni su je dobili jer:
 ## Linkovi koji trebaju biti u svakoj poruci
 
 - Članak: https://dev.to/reggiebro/i-built-an-agent-that-reads-so-i-dont-have-to-346a
-- Demo: https://92.5.41.244:8000/overnight/
+- Demo: https://92.5.95.177.sslip.io/overnight-demo/
 - Kod: https://github.com/Reggiebro/overnight
 - Video: https://github.com/Reggiebro/overnight/releases/download/v1.0.0/demo.mp4
